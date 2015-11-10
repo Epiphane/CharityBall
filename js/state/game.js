@@ -1,154 +1,32 @@
-define(['box2d'], function(Box2D) {   
-   var context;
-
-   function copyVec2(vec) {
-      return new b2Vec2(vec.get_x(), vec.get_y());
-   }
-
-   function scaledVec2(vec, scale) {
-      return new b2Vec2(scale * vec.get_x(), scale * vec.get_y());
-   }
-
-   function drawAxes(ctx) {
-      ctx.strokeStyle = 'rgb(192,0,0)';
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(30, 0);
-      ctx.stroke();
-      ctx.strokeStyle = 'rgb(0,192,0)';
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(0, 30);
-      ctx.stroke();
-   }
-
-   function setColorFromDebugDrawCallback(color) {            
-       var col = Box2D.wrapPointer(color, b2Color);
-       var red = (col.get_r() * 255)|0;
-       var green = (col.get_g() * 255)|0;
-       var blue = (col.get_b() * 255)|0;
-       var colStr = red+","+green+","+blue;
-       context.fillStyle = "rgba("+colStr+",0.5)";
-       context.strokeStyle = "rgb("+colStr+")";
-   }
-
-   function drawSegment(vert1, vert2) {
-       var vert1V = Box2D.wrapPointer(vert1, b2Vec2);
-       var vert2V = Box2D.wrapPointer(vert2, b2Vec2);                    
-       context.beginPath();
-       context.moveTo(vert1V.get_x(),vert1V.get_y());
-       context.lineTo(vert2V.get_x(),vert2V.get_y());
-       context.stroke();
-   }
-
-   function drawPolygon(vertices, vertexCount, fill) {
-       context.beginPath();
-       for(tmpI=0;tmpI<vertexCount;tmpI++) {
-           var vert = Box2D.wrapPointer(vertices+(tmpI*8), b2Vec2);
-           if ( tmpI == 0 )
-               context.moveTo(vert.get_x(),vert.get_y());
-           else
-               context.lineTo(vert.get_x(),vert.get_y());
-       }
-       context.closePath();
-       if (fill)
-           context.fill();
-       context.stroke();
-   }
-
-   function drawCircle(center, radius, axis, fill) {                    
-       var centerV = Box2D.wrapPointer(center, b2Vec2);
-       var axisV = Box2D.wrapPointer(axis, b2Vec2);
-       
-       context.beginPath();
-       context.arc(centerV.get_x(),centerV.get_y(), radius, 0, 2 * Math.PI, false);
-       if (fill)
-           context.fill();
-       context.stroke();
-       
-       if (fill) {
-           //render axis marker
-           var vert2V = copyVec2(centerV);
-           vert2V.op_add( scaledVec2(axisV, radius) );
-           context.beginPath();
-           context.moveTo(centerV.get_x(),centerV.get_y());
-           context.lineTo(vert2V.get_x(),vert2V.get_y());
-           context.stroke();
-       }
-   }
-
-   function drawTransform(transform) {
-       var trans = Box2D.wrapPointer(transform,b2Transform);
-       var pos = trans.get_p();
-       var rot = trans.get_q();
-       
-       context.save();
-       context.translate(pos.get_x(), pos.get_y());
-       context.scale(0.5,0.5);
-       context.rotate(rot.GetAngle());
-       context.lineWidth *= 2;
-       drawAxes(context);
-       context.restore();
-   }
-
-   function SetDebugDrawFunctions(debugDraw) {
-      debugDraw.DrawSegment = function(vert1, vert2, color) {                    
-         setColorFromDebugDrawCallback(color);                    
-         drawSegment(vert1, vert2);
-      };
-
-      debugDraw.DrawPolygon = function(vertices, vertexCount, color) {                    
-         setColorFromDebugDrawCallback(color);
-         drawPolygon(vertices, vertexCount, false);                    
-      };
-
-      debugDraw.DrawSolidPolygon = function(vertices, vertexCount, color) {    
-         setColorFromDebugDrawCallback(color);
-         drawPolygon(vertices, vertexCount, true);                    
-      };
-
-      debugDraw.DrawCircle = function(center, radius, color) {                    
-         setColorFromDebugDrawCallback(color);
-         var dummyAxis = b2Vec2(0,0);
-         drawCircle(center, radius, dummyAxis, false);
-      };
-
-      debugDraw.DrawSolidCircle = function(center, radius, axis, color) {                    
-         setColorFromDebugDrawCallback(color);
-         drawCircle(center, radius, axis, true);
-      };
-
-      debugDraw.DrawTransform = function(transform) {
-         drawTransform(transform);
-      };
-   }
-
-
-   function setColorFromDebugDrawCallback( colorPtr ) {
-      var color = Box2D.wrapPointer( colorPtr, b2Color );
-      var red = (color.get_r() * 255) | 0;
-      var green = (color.get_g() * 255) | 0;
-      var blue = (color.get_b() * 255) | 0;
-
-      var colorStr = red + "," + green + "," + blue;
-      context.fillStyle = "rgba(" + colorStr + ",0.5)";
-      context.strokeStyle = "rgb(" + colorStr + ")";
-   }
-
-   function drawSegment( vert1Ptr, vert2Ptr ) {
-      var vert1 = Box2D.wrapPointer( vert1Ptr, b2Vec2 );
-      var vert2 = Box2D.wrapPointer( vert2Ptr, b2Vec2 );
-
-      context.beginPath();
-      context.moveTo( vert1.get_x(), vert1.get_y() );
-      context.lineTo( vert2.get_x(), vert2.get_y() );
-      context.stroke();
-   }
-
+define([
+   'box2d',
+   'helper/box2dHelper',
+   'state/score',
+   'component/waterspawner',
+   'component/sprite'
+], function(
+   Box2D,
+   Box2DHelper,
+   ScoreState,
+   WaterSpawner,
+   Sprite
+) {
    var CONTAINER_MIDDLE = 1;
    var CONTAINER_LEFT = 0;
    var CONTAINER_RIGHT = 2;
-   var contained = [-2, -2, -2];
+   var contained = [0, 0, 0];
+
+   var waterImg = new Image();
+   waterImg.src = '/assets/water.png';
+
+   var jerrycanImg = new Image();
+   jerrycanImg.src = '/assets/jerrycan.png';
+
+   var waterUIImg = new Image();
+   waterUIImg.src = '/assets/waterui.png';
+
+   var waterUIFullImg = new Image();
+   waterUIFullImg.src = '/assets/waterui_full.png';
 
    function registerContactChange(contacting, sensor, body) {
       var containerType = sensor.GetUserData();
@@ -156,12 +34,13 @@ define(['box2d'], function(Box2D) {
       if (contacting) contained[containerType] ++;
       else contained[containerType] --;
 
-      console.log(containerType, contained[containerType]);
+      body = body.GetBody();
+      body.SetUserData(1);
    }
 
    return Juicy.State.extend({
       constructor: function() {
-         this.world = new Box2D.b2World(new Box2D.b2Vec2(0.0, -10.0));
+         this.world = new Box2D.b2World(new Box2D.b2Vec2(0.0, 10.0));
 
          listener = new JSContactListener();
          listener.BeginContact = function (contactPtr) {
@@ -177,8 +56,6 @@ define(['box2d'], function(Box2D) {
                registerContactChange(true, fixtureB, fixtureA);
             }
          }
-
-         // Empty implementations for unused methods.
          listener.EndContact = function (contactPtr) {
             var contact = Box2D.wrapPointer( contactPtr, b2Contact );
             var fixtureA = contact.GetFixtureA();
@@ -192,201 +69,183 @@ define(['box2d'], function(Box2D) {
                registerContactChange(false, fixtureB, fixtureA);
             }
          }
+         // Empty implementations for unused methods.
          listener.PreSolve = function() {};
          listener.PostSolve = function() {};
 
-         this.world.SetContactListener( listener );
+         this.world.SetContactListener(listener);
 
-         var debugDraw = new Box2D.JSDraw();
-         SetDebugDrawFunctions(debugDraw);
+         this.rainBodies = [];
+         this.rainTransitions = [];
 
-         // Empty implementations for unused methods.
-         debugDraw.SetFlags(3);
+         this.createScene();
 
-         this.world.SetDebugDraw( debugDraw );
-      
-         var bd = new b2BodyDef();
-         // bd.set_position(new b2Vec2(0, -2));
-         bd.set_type(Box2D.b2_kinematicBody);
-         // bd.set_linearVelocity(new b2Vec2(8, 0));
-         this.groundBody = bd;
+         this.player = new Juicy.Entity(this, ['Sprite']);
+         this.player.getComponent('Sprite').setSheet('assets/player.png', 8, 12);
+         this.player.width = 4/3;
+         this.player.height = 2;
 
-         var groundBody = this.groundBody = this.world.CreateBody(bd);
-         var shape = new b2EdgeShape();
-         shape.Set(new b2Vec2(-40.0, 0.0), new b2Vec2(40.0, 0.0));
-         groundBody.CreateFixture(shape, 0.0);
+         this.plate = new Image();
+         this.plate.src = 'assets/plate.png';
 
-         {
-            bd = new b2BodyDef();
-            bd.set_position(new b2Vec2(0, 1.0));
-            bd.set_type(Box2D.b2_kinematicBody);
+         this.groundImg = new Image();
+         this.groundImg.src = 'assets/ground.png';
 
-            this.playerBody = this.world.CreateBody(bd);
-            var shape = new b2CircleShape();
-            shape.set_m_radius(1.0);
-            this.playerBody.CreateFixture(shape, 0.0);
-         }
+         this.scoreText = new Juicy.Entity(this, ['Text']);
+         this.scoreText.getComponent('Text').set({
+            font: '50px Arial',
+            text: '0'
+         });
 
+         this.score = 0;
+
+         var waterfallSpawner = new WaterSpawner();
+         waterfallSpawner.setRainPerSec(20);
+         waterfallSpawner.width = 8;
+         waterfallSpawner.onspawn = this.createRain.bind(this);
+
+         this.waterfall = new Juicy.Entity(this, [waterfallSpawner]);
+         this.waterfall.position.y = -30;
+         this.waterfall.position.x = -25;
+
+         this.countdown = new Juicy.Entity(this, ['Text']);
+         this.countdown.getComponent('Text').set({
+            font: '28px Arial',
+            text: 'Time Remaining: 30'
+         });
+         this.countdown.time = this.countdown.max = 10;
+      },
+      createScene: function() {
+         // Create ground
+         Box2DHelper.createBody(this.world, {
+            type: Box2D.b2_kinematicBody
+         }, {
+            density: 0.0,
+            shape: {
+               type: 'edge',
+               args: [new b2Vec2(-40.0, 0.0), new b2Vec2(40.0, 0.0)]
+            }
+         });
+
+         // Create player body
+         this.playerBody = Box2DHelper.createBody(this.world, {
+            type: Box2D.b2_kinematicBody,
+            position: new b2Vec2(0.0, -1.0)
+         }, {
+            density: 0.0,
+            shape: {
+               type: 'circle',
+               args: [1.0]
+            }
+         });
+
+         // Create seesaw on the player
+         this.createSeesaw();
+
+         // Create shape for all the rain
          var a = 0.25;
-         shape = new b2PolygonShape();
-         shape.SetAsBox(a, a);
-         var fix = new b2FixtureDef();
-         fix.set_density(0.2);
-         fix.set_friction(10);
-         fix.set_shape(shape);
-         this.shape = fix;
+         var rainShape = Box2DHelper.createPolygonShape([new b2Vec2(0.0, -1.0), new b2Vec2(-0.5, 0.0), new b2Vec2(0.5, 0.0)]);
 
-         var x = new b2Vec2(-2.2, 5.25);
+         this.rainFixture = new b2FixtureDef();
+         this.rainFixture.set_density(120.0);
+         this.rainFixture.set_friction(10);
+         this.rainFixture.set_shape(rainShape);
+
+         // Rain body definition
+         this.rainBody = new b2BodyDef();
+         this.rainBody.set_type(Box2D.b2_dynamicBody);
+
+         // Create initial rain
+         var x = new b2Vec2(-2.2, -5.25);
          var y = new b2Vec2();
-         var deltaX = new b2Vec2(0.5625, 1.25);
+         var deltaX = new b2Vec2(0.5625, -1.25);
          var deltaY = new b2Vec2(1.125, 0.0);
 
-         bd = new b2BodyDef();
-         bd.set_type( Box2D.b2_dynamicBody );
-
-         var jointDef = null;
-
          for (var i = 0; i < 5; ++i) {
-            y = copyVec2(x);
+            y = Box2DHelper.copyVec2(x);
 
             for (var j = i; j < 5; ++j) {
-               bd.set_position(y);                        
-               var body = this.world.CreateBody(bd);
-               body.CreateFixture(this.shape);
+               this.createRain(y.get_x(), y.get_y());
                y.op_add(deltaY);
             }
 
             x.op_add(deltaX);
          }
 
-
-         var jd = new b2RevoluteJointDef();
-
-         {
-            var shape = new b2PolygonShape();
-            shape.SetAsBox(10.0, 0.125);
-
-            var bd = new b2BodyDef();
-            bd.set_type(Box2D.b2_dynamicBody);
-            bd.set_position(new b2Vec2(0.0, 2.3));
-            // bd.set_angle(-0.15);
-
-            this.seesawBody = this.world.CreateBody(bd);
-            this.seesawBody.CreateFixture(shape, 200.0);
-
-
-
-
-
-            // Water detection area?
-            shape = new b2PolygonShape();
-            shape.SetAsBox(4, 4, new b2Vec2(0, 4), 0);
-
-            bd = new b2BodyDef();
-            bd.set_type(Box2D.b2_kinematicBody);
-            bd.set_position(new b2Vec2(0.0, 4.3));
-
-            var fd = new b2FixtureDef();
-            fd.set_density(0);
-            fd.set_isSensor(true);
-            fd.set_shape(shape);
-            fd.set_userData(CONTAINER_MIDDLE);
-
-            this.seesawBody.CreateFixture(fd);
-
-            shape.SetAsBox(3, 4, new b2Vec2(7, 4), 0);
-            fd.set_userData(CONTAINER_RIGHT);
-            this.seesawBody.CreateFixture(fd);
-
-            shape.SetAsBox(3, 4, new b2Vec2(-7, 4), 0);
-            fd.set_userData(CONTAINER_LEFT);
-            this.seesawBody.CreateFixture(fd);
-            // End
-
-
-
-
-
-
-
-
-
-
-
-
-            var dw = 0.1;
-            var anchor = new b2Vec2(-dw, 1);
-            jd.Initialize(this.playerBody, this.seesawBody, anchor);
-            jd.set_collideConnected(true);
-            this.world.CreateJoint(jd);
-
-            anchor = new b2Vec2(dw, 1);
-            jd.Initialize(this.playerBody, this.seesawBody, anchor);
-            jd.set_collideConnected(true);
-            this.world.CreateJoint(jd);
-
-            shape = new b2PolygonShape();
-            shape.SetAsBox(0.2, 1.0);
-
-            bd = new b2BodyDef();
-            bd.set_type(Box2D.b2_dynamicBody);
-            bd.set_position(new b2Vec2(-4.0, 3));
-
-            var leftHook = this.leftHook = this.world.CreateBody(bd);
-            leftHook.CreateFixture(shape, 30);
-         
-            jd = new b2WeldJointDef();
-
-            anchor = new b2Vec2(0.0, 2.2);
-            jd.Initialize(leftHook, this.seesawBody, anchor);
-            jd.set_collideConnected(true);
-            this.world.CreateJoint(jd);
-
-            bd = new b2BodyDef();
-            bd.set_type(Box2D.b2_dynamicBody);
-            bd.set_position(new b2Vec2(4.0, 3));
-
-            var rightHook = this.rightHook = this.world.CreateBody(bd);
-            rightHook.CreateFixture(shape, 30);
-         
-            jd.Initialize(rightHook, this.seesawBody, anchor);
-            jd.set_collideConnected(true);
-            this.world.CreateJoint(jd);
-
-
-
-
-
-
-
-            bd = new b2BodyDef();
-            bd.set_type(Box2D.b2_dynamicBody);
-            bd.set_position(new b2Vec2(-10.0, 3));
-
-            var rightHook = this.rightHook = this.world.CreateBody(bd);
-            rightHook.CreateFixture(shape, 30);
-         
-            jd.Initialize(rightHook, this.seesawBody, anchor);
-            jd.set_collideConnected(true);
-            this.world.CreateJoint(jd);
-
-            bd = new b2BodyDef();
-            bd.set_type(Box2D.b2_dynamicBody);
-            bd.set_position(new b2Vec2(10.0, 3));
-
-            var rightHook = this.rightHook = this.world.CreateBody(bd);
-            rightHook.CreateFixture(shape, 30);
-         
-            jd.Initialize(rightHook, this.seesawBody, anchor);
-            jd.set_collideConnected(true);
-            this.world.CreateJoint(jd);
-         }
+         // Create Jerry can
+         this.jerrycan = Box2DHelper.createBody(this.world, {
+            type: Box2D.b2_kinematicBody,
+            position: new b2Vec2(27, -8)
+         }, {
+            shape: {
+               type: 'box',
+               args: [7.0, 8.0]
+            },
+            density: 0,
+            isSensor: true,
+            userData: CONTAINER_RIGHT
+         });
 
          this.speed = 0;
+      },
+      createRain: function(x, y) {
+         this.rainBody.set_position(new b2Vec2(x, y));
+         var newRainBody = Box2DHelper.createBody(this.world, this.rainBody, this.rainFixture);
 
-         this.counter = 0;
+         this.rainBodies.push(newRainBody);
+      },
+      createJoint: function(Type, root, body, anchor) {
+         var jd = new Type();
+             jd.set_collideConnected(true);
+
+         jd.Initialize(root, body, anchor);
+         this.world.CreateJoint(jd);
+      },
+      createWall: function(seesawBody, xPos, angle) {
+         var wall = Box2DHelper.createBody(this.world, {
+            type: Box2D.b2_dynamicBody,
+            position: new b2Vec2(xPos, -3.0)
+         }, {
+            density: 30.0,
+            shape: {
+               type: 'box',
+               args: [0.2, 1.0]
+            }
+         });
+
+         if (angle) {
+            wall.SetTransform(wall.GetPosition(), angle * Math.PI / 180);
+         }
+
+         this.createJoint(b2WeldJointDef, wall, seesawBody, new b2Vec2(0.0, -2.2));
+
+         return wall;
+      },
+      createSeesaw: function() {
+         // Create horizontal platform
+         var seesawBody = this.seesawBody = Box2DHelper.createBody(this.world, {
+            type: Box2D.b2_dynamicBody,
+            position: new b2Vec2(0.0, -2.3)
+         }, {
+            density: 200.0,
+            shape: {
+               type: 'box',
+               args: [4.0, 0.125]
+            }
+         });
+
+         // Attach seesaw to player
+         var djoint = 0.15;
+         this.createJoint(b2RevoluteJointDef, this.playerBody, seesawBody, new b2Vec2(-djoint, -1));
+         this.createJoint(b2RevoluteJointDef, this.playerBody, seesawBody, new b2Vec2(djoint, -1));
+
+         // Create walls
+         this.createWall(seesawBody, 4.0, 30.0);
+         this.createWall(seesawBody, -4.0, -30.0);
       },
       init: function() {
+         var debugDraw = Box2DHelper.createDebugDraw(Box2DHelper.e_shapeBit, this.game.getContext());
+         this.world.SetDebugDraw(debugDraw);
       },
       key_ESC: function() {
          this.paused = !this.paused;
@@ -396,57 +255,197 @@ define(['box2d'], function(Box2D) {
             return true;
          }
 
-         this.counter -= dt;
-         if (this.counter <= 0) {
-            this.counter = 0.5;
+         if (this.countdown.time <= 0) {
+            this.game.setState(new ScoreState(this.score));
+         
+            return;
+         }
 
-            bd = new b2BodyDef();
-            bd.set_type( Box2D.b2_dynamicBody );
+         this.waterfall.update(dt);
 
-            bd.set_position(new b2Vec2(Math.random() * 40 - 20, 30));                        
-            var body = this.world.CreateBody(bd);
-            body.CreateFixture(this.shape);
+         // Update game counter
+         this.countdown.time -= dt;
+         this.countdown.getComponent('Text').set({ text: 'Time Remaining: ' + this.countdown.time.toFixed(2) });
+
+         // Update transitions
+         for (var i = 0; i < this.rainTransitions.length; i ++) {
+            var transition = this.rainTransitions[i];
+
+            if (transition.time > 0.5) {
+               this.rainTransitions.splice(i--, 1);
+
+               this.score ++;
+
+            }
+
+            transition.time += dt;
+
+            transition.progress = transition.time * 2;
          }
 
          this.speed *= 0.9;
 
          var leftOrRight = 0;
          if (game.keyDown('LEFT')) {
-            this.leftHook.GetFixtureList().SetDensity(70);
             this.speed -= 1;
-         }
-         else {
-            this.leftHook.GetFixtureList().SetDensity(40);
+            this.player.getComponent('Sprite').flipped = true;
          }
          if (game.keyDown('RIGHT')) {
             this.speed += 1;
-            this.rightHook.GetFixtureList().SetDensity(70);
+            this.player.getComponent('Sprite').flipped = false;
          }
-         else {
-            this.rightHook.GetFixtureList().SetDensity(40);
-         }
-
-         // this.leftHook.ResetMassData();
-         // this.rightHook.ResetMassData();
 
          this.playerBody.SetLinearVelocity(new b2Vec2(this.speed, 0));
 
          // Using 1/60 instead of dt because fixed-time calculations are more accurate
          this.world.Step(1/60, 3, 2);
+
+         for (var i = 0; i < this.rainBodies.length; i ++) {
+            var rain = this.rainBodies[i];
+            var data = rain.GetUserData();
+
+            if (rain.GetPosition().get_y() > -0.5 || data === 1) {
+               if (data === 1) {
+                  this.rainTransitions.push({
+                     position: Box2DHelper.copyVec2(rain.GetPosition()),
+                     angle: rain.GetAngle(),
+                     time: 0,
+                     progress: 0
+                  });
+               }
+
+               this.rainBodies.splice(i--, 1);
+
+               this.world.DestroyBody(rain);
+            }
+         }
+
+         // Update player animation
+         this.player.position.x = this.playerBody.GetPosition().get_x();
+         this.player.position.y = this.playerBody.GetPosition().get_y();
+
+         if (game.keyDown(['LEFT', 'RIGHT'])) {
+            this.player.getComponent('Sprite').runAnimation(1, 2, 0.16, true);
+         }
+         else {
+            this.player.getComponent('Sprite').sprite = 0;
+         }
+
+         this.player.update(dt);
+
+         this.scoreText.getComponent('Text').set({ 
+            text: this.score
+         });
       },
-      render: function(c) {
-         context = c;
+      drawRain: function(context, position, angle) {
+         var imageSize = 32;
 
-         c.lineWidth = 0.1;
+         if (Math.abs(angle) >= 0.1) {
+            context.save();
+            context.translate(position.get_x() * imageSize, position.get_y() * imageSize);
+            context.rotate(angle);
 
-         c.save();
-         c.translate(30, 34);
-         c.scale(1, -1);
+            context.drawImage(waterImg, -0.5 * imageSize, -1.2 * imageSize);
+         
+            context.restore();
+         }
+         else {
+            context.drawImage(waterImg, (position.get_x() - 0.5) * imageSize, (position.get_y() - 1.2) * imageSize);
+         }
+      },
+      render: function(context) {
+         var worldOffsetX = 30, worldOffsetY = 34;
+         var imageSize = 32;
 
-         drawAxes(c);
+         context.lineWidth = 0.1;
 
-         this.world.DrawDebugData();
-         c.restore();
+         context.save();
+         context.scale(20, 20);
+
+         context.mozImageSmoothingEnabled = false;
+         context.imageSmoothingEnabled = false;
+         context.drawImage(this.groundImg, 0, worldOffsetY, this.game.width, this.game.width * this.groundImg.height / this.groundImg.width);
+
+         context.save();
+         context.translate(worldOffsetX, worldOffsetY);
+
+         // Draw jerrycan and player
+         var jerrycanPosition = this.jerrycan.GetPosition();
+         context.drawImage(jerrycanImg, jerrycanPosition.get_x(), jerrycanPosition.get_y(), 8, 8);
+
+         // this.world.DrawDebugData();
+
+         // Draw seesaw
+         {
+            context.save();
+
+            var seesawPosition = this.seesawBody.GetPosition();
+            var seesawAngle    = this.seesawBody.GetAngle();
+            context.translate(seesawPosition.get_x(), seesawPosition.get_y());
+            context.rotate(seesawAngle);
+
+            context.drawImage(this.plate, -4.5, -1.7, 9, 2);
+
+            context.restore();
+         }
+
+         context.scale(1 / imageSize, 1 / imageSize);
+         
+         // Draw rain
+         for (var i = 0; i < this.rainBodies.length; i ++) {
+            var rain = this.rainBodies[i];
+            var pos = rain.GetPosition();
+            var angle = rain.GetAngle();
+
+            this.drawRain(context, pos, angle);
+         }
+
+         for (var i = 0; i < this.rainTransitions.length; i ++) {
+            var transition = this.rainTransitions[i];
+            var progress   = transition.progress; // [0, 1]
+
+            // Compute interpolated position
+            var startX = transition.position.get_x();
+            var startY = transition.position.get_y();
+            var destX  = jerrycanPosition   .get_x() + 1;
+            var destY  = jerrycanPosition   .get_y() + 0.5;
+
+            var pos = new b2Vec2(startX + (destX - startX) * progress, startY + (destY - startY) * progress + 20 * (Math.pow(progress - 0.5, 2) - 0.25));
+
+            this.drawRain(context, pos, transition.angle);
+         }
+
+         context.restore();
+
+         // Draw player
+         context.save();
+         context.translate(worldOffsetX - this.player.width / 2, worldOffsetY - this.player.height / 2);
+
+         this.player.render(context);
+
+         context.restore();
+
+         context.restore();
+
+         // Draw interface
+         var waterWidth = 140;
+         // context.mozImageSmoothingEnabled = true;
+         // context.imageSmoothingEnabled = true;
+
+         var waterX = this.game.width - (waterWidth + 10);
+         var waterH = waterWidth * waterUIImg.height / waterUIImg.width;
+         context.drawImage(waterUIImg,     waterX, 10, waterWidth, waterH);
+
+         var percentFull = this.score / 100;
+         context.drawImage(waterUIFullImg, 0, (1 - percentFull) * waterUIFullImg.height, waterUIFullImg.width, percentFull * waterUIFullImg.height,
+                                           waterX, 10 + waterH * (1 - percentFull), waterWidth, waterH * percentFull);
+      
+         this.scoreText.render(context, this.game.width - waterWidth + 60 - this.scoreText.width / 2, 130);
+
+         var barWidth = 800;
+         context.fillStyle = 'rgba(100, 100, 255, 0.9)';
+         context.fillRect(Math.floor((this.game.width - barWidth) / 2), 10, Math.ceil(barWidth * this.countdown.time / this.countdown.max), 30);
+         this.countdown.render(context, this.game.width / 2 - this.countdown.width / 2, 60);
       }
    });
 })
