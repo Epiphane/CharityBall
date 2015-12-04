@@ -2,7 +2,7 @@
 <html>
 <head>
    <meta charset="utf-8">
-   <title>Juicy Gravity</title>
+   <title>Water Fetch</title>
    <!-- <link rel="icon" type="image/GIF" href="res/favicon.ico"/> -->
    <meta name="apple-mobile-web-app-capable" content="yes"/>
    <meta name="full-screen" content="yes"/>
@@ -12,6 +12,11 @@
 
    <link href='http://fonts.googleapis.com/css?family=Poiret+One' rel='stylesheet' type='text/css'>
    <style>
+   @font-face {
+      font-family: "Arcade Classic";
+      src: url(font/ARCADECLASSIC.TTF);
+   }
+
    /* following code make sure user won't see selection in the app */
    body, canvas, div {
       -moz-user-select: none;
@@ -30,7 +35,7 @@
       height: 100%;
    }
    canvas, #game-canvas {
-      background: rgba(11, 51, 56, 1);
+      background: #444;/*rgba(11, 51, 56, 1);*/
    }
    </style>
 </head>

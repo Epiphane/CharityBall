@@ -93,27 +93,46 @@ define([
 
          this.scoreText = new Juicy.Entity(this, ['Text']);
          this.scoreText.getComponent('Text').set({
-            font: '50px Arial',
+            font: '50px Arcade Classic',
             text: '0'
          });
 
          this.score = 0;
+         this.water = 0;
+         this.capacity = 85;
+         this.combo = 0;
+         this.comboTime = 1;
+         this.comboTimer = 0;
 
          var waterfallSpawner = new WaterSpawner();
-         waterfallSpawner.setRainPerSec(20);
-         waterfallSpawner.width = 8;
+         waterfallSpawner.setRainPerSec(25);
+         waterfallSpawner.width = 2;
          waterfallSpawner.onspawn = this.createRain.bind(this);
 
-         this.waterfall = new Juicy.Entity(this, [waterfallSpawner]);
-         this.waterfall.position.y = -30;
-         this.waterfall.position.x = -25;
+         var river = new Juicy.Entity(this, [waterfallSpawner]);
+         river.position.y = -10;
+         river.position.x = -27;
+
+         this.waterSpawners = [river];
 
          this.countdown = new Juicy.Entity(this, ['Text']);
          this.countdown.getComponent('Text').set({
-            font: '28px Arial',
+            font: '28px Arcade Classic',
             text: 'Time Remaining: 30'
          });
-         this.countdown.time = this.countdown.max = 10;
+         this.countdown.time = this.countdown.max = 45;
+
+         this.announcement = new Juicy.Entity(this, ['Box', 'Text']);
+         this.announcement.getComponent('Text').set({
+            font: '52px Arcade Classic',
+            text: 'Rain!'
+         });
+
+         var box = this.announcement.getComponent('Box')
+         box.fillStyle = '#b28a75';
+         box.strokeStyle = '#000';
+         box.lineWidth = 10;
+         box.padding = [30, 20, 30, -5];
       },
       createScene: function() {
          // Create ground
@@ -250,6 +269,10 @@ define([
       key_ESC: function() {
          this.paused = !this.paused;
       },
+      filledContainer: function() {
+         console.log('filled container!');
+         this.countdown.time = Math.min(this.countdown.time + 30, this.countdown.max);
+      },
       update: function(dt, game) {
          if (this.paused) {
             return true;
@@ -261,7 +284,20 @@ define([
             return;
          }
 
-         this.waterfall.update(dt);
+         if (this.combo) {
+            this.comboTimer -= dt;
+            if (this.comboTimer <= 0) {
+               this.comboTimer = this.comboTime;
+               this.combo --;
+               console.log('combo', this.combo);
+            }
+         }
+
+         for (var i = this.waterSpawners.length - 1; i >= 0; i--) {
+            this.waterSpawners[i].update(dt);
+         };
+
+         this.announcement.update(dt);
 
          // Update game counter
          this.countdown.time -= dt;
@@ -274,8 +310,15 @@ define([
             if (transition.time > 0.5) {
                this.rainTransitions.splice(i--, 1);
 
-               this.score ++;
-
+               this.score += 5 + this.combo;
+               this.water ++;
+               if (this.water >= this.capacity) {
+                  this.water -= this.capacity;
+                  this.filledContainer();
+               }
+               if (this.score )
+               this.combo ++;
+               this.comboTimer = this.comboTime;
             }
 
             transition.time += dt;
@@ -436,7 +479,7 @@ define([
          var waterH = waterWidth * waterUIImg.height / waterUIImg.width;
          context.drawImage(waterUIImg,     waterX, 10, waterWidth, waterH);
 
-         var percentFull = this.score / 100;
+         var percentFull = this.water / this.capacity;
          context.drawImage(waterUIFullImg, 0, (1 - percentFull) * waterUIFullImg.height, waterUIFullImg.width, percentFull * waterUIFullImg.height,
                                            waterX, 10 + waterH * (1 - percentFull), waterWidth, waterH * percentFull);
       
@@ -445,7 +488,10 @@ define([
          var barWidth = 800;
          context.fillStyle = 'rgba(100, 100, 255, 0.9)';
          context.fillRect(Math.floor((this.game.width - barWidth) / 2), 10, Math.ceil(barWidth * this.countdown.time / this.countdown.max), 30);
-         this.countdown.render(context, this.game.width / 2 - this.countdown.width / 2, 60);
+         this.countdown.render(context, Math.floor(this.game.width / 2 - this.countdown.width / 2), 60);
+
+         var announcementPosition = this.game.width / 2;
+         this.announcement.render(context, Math.floor(announcementPosition - this.announcement.width / 2), Math.floor((this.game.height - this.announcement.height) / 2));
       }
    });
 })

@@ -15,6 +15,10 @@ require([
    var RATIO = 1.6;
    var HEIGHT = 800;
 
+   document.addEventListener('keydown', function(e) {
+      if (e.keyCode === 8) { e.preventDefault(); }
+   });
+
    var gameCanvas = document.getElementById('game-canvas');
    var Game = Juicy.Game.init(gameCanvas, HEIGHT * RATIO, HEIGHT, {
       ESC: 27,
@@ -23,6 +27,7 @@ require([
       RIGHT: 39,
       DOWN: 40,
       SPACE: 32,
+      ENTER: 13,
 
       W: 87,
       A: 65,
@@ -30,8 +35,8 @@ require([
       D: 68,
    });
 
-   // Game.getContext().mozImageSmoothingEnabled = false;
-   // Game.getContext().imageSmoothingEnabled = false;
+   Game.getContext().mozImageSmoothingEnabled = false;
+   Game.getContext().imageSmoothingEnabled = false;
 
 
    // On window resize, fill it with the game again!
