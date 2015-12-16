@@ -3,13 +3,15 @@ define([
    'helper/box2dHelper',
    'state/score',
    'component/waterspawner',
-   'component/sprite'
+   'component/sprite',
+   'component/announcer'
 ], function(
    Box2D,
    Box2DHelper,
    ScoreState,
    WaterSpawner,
-   Sprite
+   Sprite,
+   Announcer
 ) {
    var CONTAINER_MIDDLE = 1;
    var CONTAINER_LEFT = 0;
@@ -99,9 +101,9 @@ define([
 
          this.score = 0;
          this.water = 0;
-         this.capacity = 85;
+         this.capacity = 75;
          this.combo = 0;
-         this.comboTime = 1;
+         this.comboTime = 0.2;
          this.comboTimer = 0;
 
          var waterfallSpawner = new WaterSpawner();
@@ -109,9 +111,12 @@ define([
          waterfallSpawner.width = 2;
          waterfallSpawner.onspawn = this.createRain.bind(this);
 
-         var river = new Juicy.Entity(this, [waterfallSpawner]);
+         var river = new Juicy.Entity(this, ['Sprite', waterfallSpawner]);
          river.position.y = -10;
          river.position.x = -27;
+         river.getComponent('Sprite').setSheet('assets/cloud.png', 100, 50);
+         river.width = 8;
+         river.height = 4;
 
          this.waterSpawners = [river];
 
@@ -120,13 +125,10 @@ define([
             font: '28px Arcade Classic',
             text: 'Time Remaining: 30'
          });
-         this.countdown.time = this.countdown.max = 45;
+         this.countdown.time = this.countdown.max = 5;
 
-         this.announcement = new Juicy.Entity(this, ['Box', 'Text']);
-         this.announcement.getComponent('Text').set({
-            font: '52px Arcade Classic',
-            text: 'Rain!'
-         });
+         this.announcement = new Juicy.Entity(this, ['Box', 'Text', 'Announcer']);
+         this.announcement.getComponent('Announcer').announce('Collect the Rain!');
 
          var box = this.announcement.getComponent('Box')
          box.fillStyle = '#b28a75';
@@ -265,13 +267,17 @@ define([
       init: function() {
          var debugDraw = Box2DHelper.createDebugDraw(Box2DHelper.e_shapeBit, this.game.getContext());
          this.world.SetDebugDraw(debugDraw);
+      
+         this.announcement.position.y = this.game.height / 2;
       },
       key_ESC: function() {
          this.paused = !this.paused;
       },
       filledContainer: function() {
          console.log('filled container!');
-         this.countdown.time = Math.min(this.countdown.time + 30, this.countdown.max);
+         this.countdown.time = Math.min(this.countdown.time + 25, this.countdown.max);
+      
+         this.capacity += 10;
       },
       update: function(dt, game) {
          if (this.paused) {
@@ -460,6 +466,13 @@ define([
 
          context.restore();
 
+         for (var i = this.waterSpawners.length - 1; i >= 0; i--) {
+            context.save();
+            context.translate(worldOffsetX - this.waterSpawners[i].width / 2, worldOffsetY - this.waterSpawners[i].height / 2);
+            this.waterSpawners[i].render(context);//, this.waterSpawners[i].position.x, -this.waterSpawners[i].position.y);
+            context.restore();
+         };
+
          // Draw player
          context.save();
          context.translate(worldOffsetX - this.player.width / 2, worldOffsetY - this.player.height / 2);
@@ -490,8 +503,9 @@ define([
          context.fillRect(Math.floor((this.game.width - barWidth) / 2), 10, Math.ceil(barWidth * this.countdown.time / this.countdown.max), 30);
          this.countdown.render(context, Math.floor(this.game.width / 2 - this.countdown.width / 2), 60);
 
-         var announcementPosition = this.game.width / 2;
-         this.announcement.render(context, Math.floor(announcementPosition - this.announcement.width / 2), Math.floor((this.game.height - this.announcement.height) / 2));
+         if (this.announcement.isAnnouncing()) {
+            this.announcement.render(context);
+         }
       }
    });
 })

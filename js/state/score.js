@@ -1,12 +1,14 @@
 define([
    'state/game',
-   'helper/auth'
+   'helper/scores'
 ], function(
    GameState,
-   Auth
+   Scores
 ) {
    return Juicy.State.extend({
       constructor: function(score) {
+         this.score = score;
+
          var self = this;
          var token = localStorage.getItem('token');
 
@@ -50,21 +52,23 @@ define([
          scoreboard_context.fillStyle = '#ffff00'; // For scores
 
          this.keypressCallback = this.keypress.bind(this);
-         Auth.get('/objects/Scores?sort=score&dir=desc&limit=5').then(function(scores) {
+         Scores.get(5).then(function(scores) {
             self.status.getComponent('Text').set({
                text: 'High Scores',
                fillStyle: '#ccff00'
             });
 
-            if (score > scores[scores.length - 1].score) {
+            if (scores.length < 5 || score > scores[scores.length - 1].score) {
                console.log('High score!');
                var ndx = scores.length - 1;
+               if (ndx < 0) ndx = 0;
+
                while (ndx > 0 && scores[ndx - 1].score < score) {
                   ndx --;
                }
 
                scores.splice(ndx, 0, 'Player Score');
-               scores.pop();
+               if (scores.length > 5) scores.pop();
 
                scoreboard_context.fillStyle = '#00ff00'; // For name
                scoreboard_context.fillText('Enter Your Name', 2 * width_4 - scoreboard_context.measureText('Enter Your Name').width / 2, 700);
@@ -122,6 +126,8 @@ define([
       },
       key_ENTER: function() {
          if (this.highscore != undefined) {
+            Scores.add(this.name, this.score);
+
             this.highscore = undefined;
             var scoreboard_context = this.scoreboard.getContext('2d');
             var clearWidth = scoreboard_context.measureText('Enter Your Name').width + 40;
