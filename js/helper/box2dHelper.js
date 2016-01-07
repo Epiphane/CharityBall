@@ -1,4 +1,10 @@
 define(['box2d'], function(Box2D) {
+   var b2Vec2 = Box2D.b2Vec2;
+   var b2BodyDef = Box2D.b2BodyDef;
+   var b2FixtureDef = Box2D.b2FixtureDef;
+   var b2EdgeShape = Box2D.b2EdgeShape;
+   var b2CircleShape = Box2D.b2CircleShape;
+   var b2PolygonShape = Box2D.b2PolygonShape;
    var Box2DHelper = {};
 
    // General utility
@@ -12,7 +18,7 @@ define(['box2d'], function(Box2D) {
 
    // Drawing utility
    var setBox2DColor = Box2DHelper.setColor = function(context, color) {            
-      var color = Box2D.wrapPointer(color, b2Color);
+      var color = Box2D.wrapPointer(color, Box2D.b2Color);
       var red   = (color.get_r() * 255) | 0;
       var green = (color.get_g() * 255) | 0;
       var blue  = (color.get_b() * 255) | 0;
@@ -155,7 +161,7 @@ define(['box2d'], function(Box2D) {
       var body = bodyDef;
       var fixture = fixtureDef;
 
-      if (!body.ptr) {
+      if (!body.ptr && !body.e) {
          body = new b2BodyDef();
          for (var property in bodyDef) {
             if (!body['set_' + property]) {
@@ -166,7 +172,7 @@ define(['box2d'], function(Box2D) {
          }
       }
       
-      if (!fixture.ptr) {
+      if (!fixture.ptr && !fixture.e) {
          fixture = new b2FixtureDef();
          for (var property in fixtureDef) {
             if (!fixture['set_' + property]) {

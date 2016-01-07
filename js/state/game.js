@@ -3,6 +3,7 @@ define([
    'helper/box2dHelper',
    'state/score',
    'component/waterspawner',
+   'component/cloud',
    'component/sprite',
    'component/announcer'
 ], function(
@@ -10,25 +11,36 @@ define([
    Box2DHelper,
    ScoreState,
    WaterSpawner,
+   Cloud,
    Sprite,
    Announcer
 ) {
+   var b2Vec2 = Box2D.b2Vec2;
+   var b2BodyDef = Box2D.b2BodyDef;
+   var b2RevoluteJointDef = Box2D.b2RevoluteJointDef;
+   var b2FixtureDef = Box2D.b2FixtureDef;
+   var b2EdgeShape = Box2D.b2EdgeShape;
+   var b2CircleShape = Box2D.b2CircleShape;
+   var b2PolygonShape = Box2D.b2PolygonShape;
+   var b2WeldJointDef = Box2D.b2WeldJointDef;
+   var b2Contact = Box2D.b2Contact;
+
    var CONTAINER_MIDDLE = 1;
    var CONTAINER_LEFT = 0;
    var CONTAINER_RIGHT = 2;
    var contained = [0, 0, 0];
 
    var waterImg = new Image();
-   waterImg.src = '/assets/water.png';
+   waterImg.src = 'assets/water.png';
 
    var jerrycanImg = new Image();
-   jerrycanImg.src = '/assets/jerrycan.png';
+   jerrycanImg.src = 'assets/jerrycan.png';
 
    var waterUIImg = new Image();
-   waterUIImg.src = '/assets/waterui.png';
+   waterUIImg.src = 'assets/waterui.png';
 
    var waterUIFullImg = new Image();
-   waterUIFullImg.src = '/assets/waterui_full.png';
+   waterUIFullImg.src = 'assets/waterui_full.png';
 
    function registerContactChange(contacting, sensor, body) {
       var containerType = sensor.GetUserData();
@@ -42,9 +54,10 @@ define([
 
    return Juicy.State.extend({
       constructor: function() {
+         var self = this;
          this.world = new Box2D.b2World(new Box2D.b2Vec2(0.0, 10.0));
 
-         listener = new JSContactListener();
+         listener = new Box2D.JSContactListener();
          listener.BeginContact = function (contactPtr) {
             var contact = Box2D.wrapPointer( contactPtr, b2Contact );
             var fixtureA = contact.GetFixtureA();
@@ -77,6 +90,18 @@ define([
 
          this.world.SetContactListener(listener);
 
+         // Contact filter for the ledge on the left side of the screen
+         var contactFilter = new Box2D.JSContactFilter();
+         contactFilter.ShouldCollide = function(fixtureA, fixtureB) {
+            var containsPlatform = fixtureA === self.leftWallFixture.e   || fixtureB === self.leftWallFixture.e ||
+                                   fixtureA === self.seesawBodyFixture.e || fixtureB === self.seesawBodyFixture.e;
+            var fixtureIsRiverSlope = (fixtureA === self.riverSlopeFixture.e || fixtureB === self.riverSlopeFixture.e);
+
+            return !containsPlatform || !fixtureIsRiverSlope;
+         }
+
+         this.world.SetContactFilter(contactFilter);
+
          this.rainBodies = [];
          this.rainTransitions = [];
 
@@ -107,34 +132,61 @@ define([
          this.comboTimer = 0;
 
          var waterfallSpawner = new WaterSpawner();
-         waterfallSpawner.setRainPerSec(25);
+         waterfallSpawner.setRainPerSec(20);
          waterfallSpawner.width = 2;
          waterfallSpawner.onspawn = this.createRain.bind(this);
 
          var river = new Juicy.Entity(this, ['Sprite', waterfallSpawner]);
          river.position.y = -10;
-         river.position.x = -27;
-         river.getComponent('Sprite').setSheet('assets/cloud.png', 100, 50);
+         river.position.x = -35;
+         // river.getComponent('Sprite').setSheet('assets/cloud.png', 100, 50);
          river.width = 8;
          river.height = 4;
 
          this.waterSpawners = [river];
+
+         // Create a moving cloud 
+         // this.waterSpawners.push(this.createCloud(4, -1, -15, -20, 1.5));
 
          this.countdown = new Juicy.Entity(this, ['Text']);
          this.countdown.getComponent('Text').set({
             font: '28px Arcade Classic',
             text: 'Time Remaining: 30'
          });
-         this.countdown.time = this.countdown.max = 5;
+         this.countdown.time = this.countdown.max = 45;
 
          this.announcement = new Juicy.Entity(this, ['Box', 'Text', 'Announcer']);
-         this.announcement.getComponent('Announcer').announce('Collect the Rain!');
+         this.announcement.getComponent('Announcer').announce('Collect the Water!');
 
          var box = this.announcement.getComponent('Box')
          box.fillStyle = '#b28a75';
          box.strokeStyle = '#000';
          box.lineWidth = 10;
          box.padding = [30, 20, 30, -5];
+
+         this.timeUntilStorm = 5.0;
+      },
+      createCloud: function(rps, life, x, y, dx) {
+         var cloudSpawner = new WaterSpawner();
+         cloudSpawner.setRainPerSec(rps);
+         cloudSpawner.width = 2;
+         cloudSpawner.onspawn = this.createRain.bind(this);
+
+         var cloud = new Juicy.Entity(this, ['Sprite', cloudSpawner, new Cloud(life, dx)]);
+         cloud.position.y = y;
+         cloud.position.x = x;
+         cloud.getComponent('Sprite').setSheet('assets/cloud.png', 100, 50);
+         cloud.width = 8;
+         cloud.height = 4;
+
+         return cloud;
+      },
+      createStorm: function() {
+         this.announcement.getComponent('Announcer').announce('Rainstorm!!');
+
+         this.waterSpawners.push(this.createCloud(10, 40, -15, -20, 1.5));
+         this.waterSpawners.push(this.createCloud(15, 63, -20, -23, 1.8));
+         this.waterSpawners.push(this.createCloud(15, 35, 10, -17, -1.0));
       },
       createScene: function() {
          // Create ground
@@ -147,6 +199,19 @@ define([
                args: [new b2Vec2(-40.0, 0.0), new b2Vec2(40.0, 0.0)]
             }
          });
+
+         // Create ledge
+         this.riverSlope = Box2DHelper.createBody(this.world, {
+            type: Box2D.b2_kinematicBody
+         }, {
+            density: 0.0,
+            shape: {
+               type: 'edge',
+               args: [new b2Vec2(-40.0, 0.0), new b2Vec2(40.0, 0.0)]
+            }
+         });
+         this.riverSlope.SetTransform(new b2Vec2(-25.0, 0.0), -15.0);
+         this.riverSlopeFixture = this.riverSlope.GetFixtureList();
 
          // Create player body
          this.playerBody = Box2DHelper.createBody(this.world, {
@@ -165,11 +230,15 @@ define([
 
          // Create shape for all the rain
          var a = 0.25;
-         var rainShape = Box2DHelper.createPolygonShape([new b2Vec2(0.0, -1.0), new b2Vec2(-0.5, 0.0), new b2Vec2(0.5, 0.0)]);
+         var rainShape = Box2DHelper.createPolygonShape([
+            new b2Vec2(0.0, -1.0), 
+            new b2Vec2(-0.5, 0.0), 
+            new b2Vec2(0.5, 0.0)
+         ]);
 
          this.rainFixture = new b2FixtureDef();
          this.rainFixture.set_density(120.0);
-         this.rainFixture.set_friction(10);
+         this.rainFixture.set_friction(1);
          this.rainFixture.set_shape(rainShape);
 
          // Rain body definition
@@ -254,6 +323,7 @@ define([
                args: [4.0, 0.125]
             }
          });
+         this.seesawBodyFixture = this.seesawBody.GetFixtureList();
 
          // Attach seesaw to player
          var djoint = 0.15;
@@ -262,7 +332,8 @@ define([
 
          // Create walls
          this.createWall(seesawBody, 4.0, 30.0);
-         this.createWall(seesawBody, -4.0, -30.0);
+         this.leftWall = this.createWall(seesawBody, -4.0, -30.0);
+         this.leftWallFixture = this.leftWall.GetFixtureList();
       },
       init: function() {
          var debugDraw = Box2DHelper.createDebugDraw(Box2DHelper.e_shapeBit, this.game.getContext());
@@ -299,8 +370,13 @@ define([
             }
          }
 
+         // Update all water spawning entities
          for (var i = this.waterSpawners.length - 1; i >= 0; i--) {
             this.waterSpawners[i].update(dt);
+
+            if (this.waterSpawners[i].remove) {
+               this.waterSpawners.splice(i--, 1);
+            }
          };
 
          this.announcement.update(dt);
@@ -308,6 +384,14 @@ define([
          // Update game counter
          this.countdown.time -= dt;
          this.countdown.getComponent('Text').set({ text: 'Time Remaining: ' + this.countdown.time.toFixed(2) });
+
+         // Start a storm?
+         this.timeUntilStorm -= dt;
+         if (this.timeUntilStorm <= 0) {
+            this.createStorm();
+
+            this.timeUntilStorm = 100;
+         }
 
          // Update transitions
          for (var i = 0; i < this.rainTransitions.length; i ++) {
@@ -338,10 +422,14 @@ define([
          if (game.keyDown('LEFT')) {
             this.speed -= 1;
             this.player.getComponent('Sprite').flipped = true;
+
+            this.leftWall.SetActive(this.seesawBody.GetPosition().get_x() > -18.0);
          }
          if (game.keyDown('RIGHT')) {
             this.speed += 1;
             this.player.getComponent('Sprite').flipped = false;
+
+            this.leftWall.SetActive(true);
          }
 
          this.playerBody.SetLinearVelocity(new b2Vec2(this.speed, 0));
@@ -352,8 +440,10 @@ define([
          for (var i = 0; i < this.rainBodies.length; i ++) {
             var rain = this.rainBodies[i];
             var data = rain.GetUserData();
+            var pos  = rain.GetPosition();
 
-            if (rain.GetPosition().get_y() > -0.5 || data === 1) {
+            if (pos.get_y() > -0.5 || data === 1 ||
+                (pos.get_x() < -20 && pos.get_y() > -2.0)) {
                if (data === 1) {
                   this.rainTransitions.push({
                      position: Box2DHelper.copyVec2(rain.GetPosition()),
@@ -413,7 +503,7 @@ define([
 
          context.mozImageSmoothingEnabled = false;
          context.imageSmoothingEnabled = false;
-         context.drawImage(this.groundImg, 0, worldOffsetY, this.game.width, this.game.width * this.groundImg.height / this.groundImg.width);
+         context.drawImage(this.groundImg, 0, worldOffsetY - 6, 68, 12);//this.game.width, this.game.width * this.groundImg.height / this.groundImg.width);
 
          context.save();
          context.translate(worldOffsetX, worldOffsetY);
@@ -422,7 +512,9 @@ define([
          var jerrycanPosition = this.jerrycan.GetPosition();
          context.drawImage(jerrycanImg, jerrycanPosition.get_x(), jerrycanPosition.get_y(), 8, 8);
 
-         // this.world.DrawDebugData();
+         if (location.href.indexOf('localhost') >= 0) {
+            this.world.DrawDebugData();
+         }
 
          // Draw seesaw
          {

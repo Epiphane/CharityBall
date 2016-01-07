@@ -50,10 +50,11 @@ define(['helper/ajax'], function(Ajax) {
    };
 
    if (token) {
-      Auth.verify = new Promise(Auth.testLoginToken);
+      Auth.verify = new Promise(function(resolve) { resolve(); });//Auth.testLoginToken);
    }
    else {
-      Auth.verify = new Promise(Auth.promptLogin);
+      Auth.verify = new Promise(function(resolve) { resolve(); });//Auth.testLoginToken);
+      // Auth.verify = new Promise(Auth.promptLogin);
    }
 
    for (var method in Ajax) {
