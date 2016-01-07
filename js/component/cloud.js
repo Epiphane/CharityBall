@@ -25,7 +25,7 @@ define([], function() {
 
             var entity = this.entity;
 
-            entity.getComponent('Sprite').runAnimation(1, 3, 0.6, false);
+            entity.getComponent('Sprite').runAnimation(1, 5, 0.6, false);
             entity.getComponent('Sprite').oncompleteanimation = function() {
                entity.remove = true;
             }

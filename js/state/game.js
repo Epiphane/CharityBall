@@ -513,7 +513,7 @@ define([
          context.drawImage(jerrycanImg, jerrycanPosition.get_x(), jerrycanPosition.get_y(), 8, 8);
 
          if (location.href.indexOf('localhost') >= 0) {
-            this.world.DrawDebugData();
+            // this.world.DrawDebugData();
          }
 
          // Draw seesaw
